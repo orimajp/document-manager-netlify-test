@@ -10,8 +10,12 @@
     </v-app-bar>
     <v-main>
       <v-container>
-        <h1 v-if="loginState">こんにちは{{ userName }}さん</h1>
-        <h1 v-else>開発中</h1>
+        <v-card>
+          <v-card-text>
+            <h1 v-if="loginState">こんにちは{{ userName }}さん</h1>
+            <h1 v-else>開発中</h1>
+          </v-card-text>
+        </v-card>
       </v-container>
     </v-main>
   </div>
