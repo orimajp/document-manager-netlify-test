@@ -22,10 +22,12 @@ export async function connectDb() {
     return collections
   }
 
+  console.log('db connect start.')
   const client = await MongoClient.connect(MONGODB_URI as string, {
     useNewUrlParser: true,
     useUnifiedTopology: true
   })
+  console.log('db connect end.')
 
   const db = client.db(DB_NAME)
 
