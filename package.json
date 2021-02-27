@@ -24,7 +24,9 @@
     "jsonwebtoken": "^8.5.1",
     "mongodb": "^3.6.4",
     "nuxt": "^2.15.1",
-    "saslprep": "^1.0.3"
+    "remark": "^13.0.0",
+    "saslprep": "^1.0.3",
+    "strip-markdown": "^4.0.0"
   },
   "devDependencies": {
     "@babel/preset-typescript": "^7.12.17",
