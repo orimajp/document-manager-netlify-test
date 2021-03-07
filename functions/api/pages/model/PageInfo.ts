@@ -1,11 +1,9 @@
-export interface DocumentInfo {
+export interface PageInfo {
   documentId: string
+  pageId: string
   pageTitle: string
   pageData: string
-  editLock: boolean
-  archive: boolean
-  groupId: string
-  groupName: string
+  delete: boolean
   pageRegisterUserId: string
   pageRegisterUserName: string
   pageRegisterDate: string

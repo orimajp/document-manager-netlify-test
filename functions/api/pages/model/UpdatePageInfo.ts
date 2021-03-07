@@ -1,4 +1,5 @@
-export interface UpdateDocumentInfo {
+export interface UpdatePageInfo {
+  pageId: string
   documentId: string
   pageTitle: string
   pageData: string

@@ -1,14 +1,14 @@
 import { ObjectId } from 'mongodb'
-import { Category, Collections, Document, Page, User } from '../db/DbService'
+import { Group, Collections, Document, Page, User } from '../db/DbService'
 import { DecodeTokenInfo } from '../auth/DecodeTokenInfo'
+import { createSearchData } from '../shared/SearchDataCreator'
 import { DocumentInfo } from './model/DocumentInfo'
 import { RegisterDocument } from './model/RegisterDocument'
-import { UpdateDocumentCategoryInfo } from './model/UpdateDocumentCategoryInfo'
-import { UpdateDocumentInfo } from './model/UpdateDocumentInfo'
-import { UpdateDocumentAttribute } from './model/UpdateDocumentAttribute'
+import { UpdateDocumentGroupInfo } from './model/UpdateDocumentGroupInfo'
 import { DocumentListInfo } from './model/DocumentListInfo'
-const remark = require('remark')
-const strip = require('strip-markdown')
+import { DocumentIndexInfo } from './model/DocumentIndexInfo'
+import { ArchiveDocumentInfo } from './model/ArchiveDocumentInfo'
+import { LockDocumentInfo } from './model/LockDocumentInfo'
 
 /**
  * ドキュメントサービス
@@ -17,10 +17,10 @@ export class DocumentService {
   constructor(private readonly collections: Collections) {}
 
   // ドキュメントリスト取得
-  async getCategoryList(): Promise<Array<DocumentListInfo>> {
+  async getDocumentList(): Promise<Array<DocumentListInfo>> {
     const ducumentList: Array<DocumentListInfo> = []
     await this.collections.documents
-      .aggregate<Document & { page: Page } & { category: Category }>([
+      .aggregate<Document & { page: Page } & { group: Group }>([
         {
           $lookup: {
             from: 'pages',
@@ -34,14 +34,14 @@ export class DocumentService {
         },
         {
           $lookup: {
-            from: 'categories',
-            localField: 'categoryId',
+            from: 'groups',
+            localField: 'groupId',
             foreignField: '_id',
-            as: 'category'
+            as: 'group'
           }
         },
         {
-          $unwind: '$category'
+          $unwind: '$group'
         },
         {
           $sort: {
@@ -50,17 +50,17 @@ export class DocumentService {
         }
       ])
       .toArray()
-      .then((documentPageCategories) => {
-        documentPageCategories.forEach((documentPageCategory) => {
-          const page = documentPageCategory.page
-          const category = documentPageCategory.category
+      .then((documentPageGroups) => {
+        documentPageGroups.forEach((documentPageGroup) => {
+          const page = documentPageGroup.page
+          const group = documentPageGroup.group
           const documentListInfo: DocumentListInfo = {
-            documentId: documentPageCategory._id?.toHexString() as string,
+            documentId: documentPageGroup._id?.toHexString() as string,
             pageTitle: page.pageTitle,
-            editLock: documentPageCategory.editLock,
-            archive: documentPageCategory.archive,
-            categoryId: documentPageCategory.catetoryId.toHexString(),
-            categoryName: category.name
+            editLock: documentPageGroup.editLock,
+            archive: documentPageGroup.archive,
+            groupId: documentPageGroup.groupId.toHexString(),
+            groupName: group.name
           }
           ducumentList.push(documentListInfo)
         })
@@ -70,10 +70,10 @@ export class DocumentService {
   }
 
   // ドキュメント取得
-  async getCategoryById(documentId: string): Promise<DocumentInfo | null> {
-    const category = await this.getCategoryByDocumentId(documentId)
-    if (!category) {
-      throw new Error('カテゴリ未発見')
+  async getDocumentById(documentId: string): Promise<DocumentInfo | null> {
+    const group = await this.getGroupByDocumentId(documentId)
+    if (!group) {
+      throw new Error('グループ未発見')
     }
 
     const documentInfos: Array<DocumentInfo> = []
@@ -100,7 +100,7 @@ export class DocumentService {
         {
           $lookup: {
             from: 'users',
-            localField: 'registerUserIs',
+            localField: 'registerUserId',
             foreignField: '_id',
             as: 'registerUser'
           }
@@ -132,19 +132,21 @@ export class DocumentService {
             pageData: pageDocument.pageData,
             editLock: document.editLock,
             archive: document.archive,
-            categoryId: document.catetoryId.toHexString(),
-            categoryName: category.name,
+            groupId: document.groupId.toHexString(),
+            groupName: group.name,
             pageRegisterDate: pageDocument.registerDate.toISOString(),
-            pageRegisterUserId: registerUser._id?.toHexString() || '',
+            pageRegisterUserId: pageDocument.registerUserId.toHexString() || '',
+            pageRegisterUserName: registerUser.userName,
             pageUpdateDate: pageDocument.updateDate.toISOString(),
-            pageUpdateUserId: updateUser._id?.toHexString() || '',
+            pageUpdateUserId: pageDocument.updateUserId.toHexString() || '',
+            pageUpdateUserName: updateUser.userName,
             pageVersion: pageDocument.version
           }
           documentInfos.push(documentInfo)
         })
       })
 
-    if (documentInfos.length) {
+    if (!documentInfos.length) {
       return null
     }
 
@@ -154,19 +156,19 @@ export class DocumentService {
   // ドキュメント登録
   async registerDocument(
     registerDocumentInfo: RegisterDocument,
-    userInf: DecodeTokenInfo
+    userInfo: DecodeTokenInfo
   ): Promise<string> {
     const user = await this.collections.users.findOne({
-      _id: new ObjectId(userInf.userId)
+      _id: new ObjectId(userInfo.userId)
     })
     // FIXME userがnullの場合は？
 
-    const oCategoryId = new ObjectId(registerDocumentInfo.categoryId || '0')
-    // FIXME 存在しないカテゴリの場合は？
+    const oGroupId = new ObjectId(registerDocumentInfo.groupId || '0')
+    // FIXME 存在しないグループの場合は？
     const now = new Date()
 
     const documentResult = await this.collections.documents.insertOne({
-      catetoryId: oCategoryId,
+      groupId: oGroupId,
       editLock: false,
       archive: false,
       registerDate: now,
@@ -194,58 +196,33 @@ export class DocumentService {
     return documentId.toHexString()
   }
 
-  // カテゴリ変更
-  async updateDocumentCategory(
-    updateDocumentCategoryInfo: UpdateDocumentCategoryInfo
+  // グループ変更
+  async updateDocumentGroup(
+    updateDocumentGroupInfo: UpdateDocumentGroupInfo,
+    userInf: DecodeTokenInfo
   ): Promise<boolean> {
-    const oCategoryId = new ObjectId(updateDocumentCategoryInfo.categoryId)
-    const category = await this.collections.categories.findOne({
-      _id: oCategoryId
+    const now = new Date()
+    const oGroupId = new ObjectId(updateDocumentGroupInfo.groupId)
+    const group = await this.collections.groups.findOne({
+      _id: oGroupId
     })
-    if (!category) {
-      throw new Error('カテゴリ未発見')
+    if (!group) {
+      throw new Error('グループ未発見')
     }
 
     const result = await this.collections.documents.updateOne(
       {
-        _id: new ObjectId(updateDocumentCategoryInfo.documentId),
-        version: updateDocumentCategoryInfo.version
+        _id: new ObjectId(updateDocumentGroupInfo.documentId),
+        version: updateDocumentGroupInfo.version
       },
       {
         $set: {
-          catetoryId: oCategoryId
-        }
-      }
-    )
-
-    return result.modifiedCount !== 1
-  }
-
-  // ドキュメント更新
-  // TODO pageの更新に移動？
-  async updateDocument(
-    updateDocument: UpdateDocumentInfo,
-    userInf: DecodeTokenInfo
-  ): Promise<boolean> {
-    const user = await this.collections.users.findOne({
-      _id: new ObjectId(userInf.userId)
-    })
-    // FIXME userがnullの場合は？
-    const now = new Date()
-
-    const result = await this.collections.pages.updateOne(
-      {
-        _id: new ObjectId(updateDocument.documentId),
-        version: updateDocument.version
-      },
-      {
-        $set: {
-          pageTitle: updateDocument.pageTitle,
-          pageData: updateDocument.pageData,
-          searchData: createSearchData(updateDocument.pageData),
+          groupId: oGroupId,
           updateDate: now,
-          updateUserId: user?._id as ObjectId,
-          version: updateDocument.version + 1
+          updateUserId: new ObjectId(userInf.userId)
+        },
+        $inc: {
+          version: 1
         }
       }
     )
@@ -253,10 +230,14 @@ export class DocumentService {
     return result.modifiedCount !== 1
   }
 
-  // ドキュメント削除
+  // ドキュメント削除(物理削除)
   async deleteDocument(documentId: string): Promise<boolean> {
     const oDocumentId = new ObjectId(documentId)
     await this.collections.pages.deleteMany({
+      documentId: oDocumentId
+    })
+
+    await this.collections.nodes.deleteOne({
       documentId: oDocumentId
     })
 
@@ -269,17 +250,24 @@ export class DocumentService {
 
   // ドキュメントアーカイブ
   async archiveDocument(
-    documentAttribute: UpdateDocumentAttribute,
-    archive: boolean
+    archiveDocumentInfo: ArchiveDocumentInfo,
+    userInf: DecodeTokenInfo
   ): Promise<boolean> {
+    const now = new Date()
+    // ドキュメントの更新情報(ユーザID、更新日、バージョンなど)
     const result = await this.collections.documents.updateOne(
       {
-        _id: new ObjectId(documentAttribute.documentId),
-        version: documentAttribute.version
+        _id: new ObjectId(archiveDocumentInfo.documentId),
+        version: archiveDocumentInfo.version
       },
       {
         $set: {
-          archive
+          archive: archiveDocumentInfo.archive,
+          updateDate: now,
+          updateUserId: new ObjectId(userInf.userId)
+        },
+        $inc: {
+          version: 1
         }
       }
     )
@@ -289,17 +277,24 @@ export class DocumentService {
 
   // ドキュメントロック
   async lockDocument(
-    documentAttribute: UpdateDocumentAttribute,
-    lock: boolean
+    lockDocumentInfo: LockDocumentInfo,
+    userInf: DecodeTokenInfo
   ): Promise<boolean> {
+    const now = new Date()
+    // ドキュメントの更新情報(ユーザID、更新日、バージョンなど)
     const result = await this.collections.documents.updateOne(
       {
-        _id: new ObjectId(documentAttribute.documentId),
-        version: documentAttribute.version
+        _id: new ObjectId(lockDocumentInfo.documentId),
+        version: lockDocumentInfo.version
       },
       {
         $set: {
-          editLock: lock
+          editLock: lockDocumentInfo.lock,
+          updateDate: now,
+          updateUserId: new ObjectId(userInf.userId)
+        },
+        $inc: {
+          version: 1
         }
       }
     )
@@ -307,38 +302,70 @@ export class DocumentService {
     return result.modifiedCount !== 1
   }
 
-  private async getCategoryByDocumentId(
-    documentId: string
-  ): Promise<Category | null> {
-    const categories: Array<Category> = []
-    await this.collections.documents
-      .aggregate<Document & { category: Category }>([
+  async getIndexList(documentId: string): Promise<Array<DocumentIndexInfo>> {
+    const indexes: Array<DocumentIndexInfo> = []
+
+    await this.collections.nodes
+      .aggregate<Node & { page: Page }>([
         {
-          _id: new ObjectId(documentId)
+          $match: { documentId }
         },
         {
           $lookup: {
-            from: 'categories',
-            localField: 'categoryId',
+            from: 'pages',
+            localField: '_id',
             foreignField: '_id',
-            as: 'caetgory'
+            as: 'page'
           }
         },
         {
-          $unwind: '$category'
+          $unwind: '$page'
         }
       ])
       .toArray()
-      .then((documentCategories) => {
-        documentCategories.forEach((documentCategory) => {
-          categories.push(documentCategory.category)
+      .then((nodePages) => {
+        nodePages.forEach((nodePage) => {
+          const page = nodePage.page
+          const index: DocumentIndexInfo = {
+            pageId: page._id?.toHexString() as string,
+            title: page.pageTitle,
+            body: page.searchData
+          }
+          indexes.push(index)
         })
       })
 
-    return categories.length ? categories[0] : null
+    return indexes
   }
-}
 
-function createSearchData(pageData: string): string {
-  return remark().use(strip).processSync(pageData).toString()
+  private async getGroupByDocumentId(
+    documentId: string
+  ): Promise<Group | null> {
+    const groups: Array<Group> = []
+    await this.collections.documents
+      .aggregate<Document & { group: Group }>([
+        {
+          $match: { _id: new ObjectId(documentId) }
+        },
+        {
+          $lookup: {
+            from: 'groups',
+            localField: 'groupId',
+            foreignField: '_id',
+            as: 'group'
+          }
+        },
+        {
+          $unwind: '$group'
+        }
+      ])
+      .toArray()
+      .then((documentGroups) => {
+        documentGroups.forEach((documentGroup) => {
+          groups.push(documentGroup.group)
+        })
+      })
+
+    return groups.length ? groups[0] : null
+  }
 }

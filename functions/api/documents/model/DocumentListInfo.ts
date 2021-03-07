@@ -3,6 +3,6 @@ export interface DocumentListInfo {
   pageTitle: string
   editLock: boolean
   archive: boolean
-  categoryId: string
-  categoryName: string
+  groupId: string
+  groupName: string
 }

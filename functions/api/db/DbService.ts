@@ -12,7 +12,7 @@ export type User = {
   password: string
 }
 
-export type Category = {
+export type Group = {
   _id?: ObjectID
   name: string
   registerDate: Date
@@ -24,7 +24,7 @@ export type Category = {
 
 export type Document = {
   _id?: ObjectID
-  catetoryId: ObjectID
+  groupId: ObjectID
   editLock: boolean
   archive: boolean
   registerDate: Date
@@ -69,7 +69,7 @@ export type Asset = {
 
 export type Collections = {
   users: Collection<User>
-  categories: Collection<Category>
+  groups: Collection<Group>
   documents: Collection<Document>
   pages: Collection<Page>
   nodes: Collection<Node>
@@ -94,7 +94,7 @@ export async function connectDb() {
 
   collections = {} as Collections
   collections.users = db.collection<User>('users')
-  collections.categories = db.collection<Category>('categories')
+  collections.groups = db.collection<Group>('groups')
   collections.documents = db.collection<Document>('documents')
   collections.pages = db.collection<Page>('pages')
   collections.nodes = db.collection<Node>('nodes')
