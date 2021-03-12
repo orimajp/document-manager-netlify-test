@@ -9,6 +9,8 @@ import { DocumentListInfo } from './model/DocumentListInfo'
 import { DocumentIndexInfo } from './model/DocumentIndexInfo'
 import { ArchiveDocumentInfo } from './model/ArchiveDocumentInfo'
 import { LockDocumentInfo } from './model/LockDocumentInfo'
+import { DeleteDocumentInfo } from './model/DeleteDocumentInfo'
+import { SearchDocumentIndexInfo } from './model/SearchDocumentIndexInfo'
 
 /**
  * ドキュメントサービス
@@ -231,8 +233,10 @@ export class DocumentService {
   }
 
   // ドキュメント削除(物理削除)
-  async deleteDocument(documentId: string): Promise<boolean> {
-    const oDocumentId = new ObjectId(documentId)
+  async deleteDocument(
+    deleteDocumentInfo: DeleteDocumentInfo
+  ): Promise<boolean> {
+    const oDocumentId = new ObjectId(deleteDocumentInfo.documentId)
     await this.collections.pages.deleteMany({
       documentId: oDocumentId
     })
@@ -302,13 +306,17 @@ export class DocumentService {
     return result.modifiedCount !== 1
   }
 
-  async getIndexList(documentId: string): Promise<Array<DocumentIndexInfo>> {
+  async getIndexList(
+    searchDocumentIndexInfo: SearchDocumentIndexInfo
+  ): Promise<Array<DocumentIndexInfo>> {
     const indexes: Array<DocumentIndexInfo> = []
 
     await this.collections.nodes
       .aggregate<Node & { page: Page }>([
         {
-          $match: { documentId }
+          $match: {
+            documentId: new ObjectId(searchDocumentIndexInfo.documentId)
+          }
         },
         {
           $lookup: {

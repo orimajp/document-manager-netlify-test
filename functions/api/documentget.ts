@@ -3,12 +3,12 @@ import { createContainer } from './container/ServiceContainer'
 
 export const handler: Handler = (event, context) => {
   context.callbackWaitsForEmptyEventLoop = false
-  return getUser(event)
+  return getDocument(event)
 }
 
-const getUser = async (event: APIGatewayEvent) => {
+const getDocument = async (event: APIGatewayEvent) => {
   const conatainer = await createContainer()
-  const userService = conatainer.userService
+  const documentService = conatainer.documentService
   const authService = conatainer.authService
 
   if (event.httpMethod !== 'GET') {
@@ -32,22 +32,9 @@ const getUser = async (event: APIGatewayEvent) => {
     }
   }
 
-  console.log(token)
-  console.log(`userId=${token.userId}`)
-
-  if (event.httpMethod !== 'GET') {
-    return {
-      statusCode: 405,
-      body: JSON.stringify({ error: 'Method NotAllowd' }),
-      headers: {
-        'Content-type': 'application/json;charset=UTF-8'
-      }
-    }
-  }
-
-  const userId = event.queryStringParameters?.userid
-  if (!userId) {
-    const errors = { userId: 'userIdは必須です' }
+  const documentId = event.queryStringParameters?.documentId
+  if (!documentId) {
+    const errors = { documentId: 'documentIdは必須です' }
     return {
       statusCode: 400,
       body: JSON.stringify({ error: errors }),
@@ -57,21 +44,11 @@ const getUser = async (event: APIGatewayEvent) => {
     }
   }
 
-  if (userId.length !== 12 && userId.length !== 24) {
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ error: { uesrId: 'userId長が不正です' } }),
-      headers: {
-        'Content-type': 'application/json;charset=UTF-8'
-      }
-    }
-  }
-
-  const user = await userService.findUserById(userId)
-  if (!user) {
+  const document = await documentService.getDocumentById(documentId)
+  if (!document) {
     return {
       statusCode: 404,
-      body: JSON.stringify({ error: 'userが見つかりません' }),
+      body: JSON.stringify({ error: 'documentIdが見つかりません' }),
       headers: {
         'Content-type': 'application/json;charset=UTF-8'
       }
@@ -80,7 +57,7 @@ const getUser = async (event: APIGatewayEvent) => {
 
   return {
     statusCode: 200,
-    body: JSON.stringify(user),
+    body: JSON.stringify(document),
     headers: {
       'Content-type': 'application/json;charset=UTF-8'
     }

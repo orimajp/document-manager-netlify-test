@@ -1,11 +1,13 @@
 import { connectDb } from '../db/DbService'
 import { UserService } from '../users/UserService'
 import { AuthService } from '../auth/AuthService'
+import { DocumentService } from '../documents/DocumentService'
 
 export class ServiceContainer {
   constructor(
     public readonly userService: UserService,
-    public readonly authService: AuthService
+    public readonly authService: AuthService,
+    public readonly documentService: DocumentService
   ) {}
 }
 
@@ -19,7 +21,8 @@ export async function createContainer(): Promise<ServiceContainer> {
   const collections = await connectDb()
   container = new ServiceContainer(
     new UserService(collections),
-    new AuthService(collections)
+    new AuthService(collections),
+    new DocumentService(collections)
   )
 
   return container
