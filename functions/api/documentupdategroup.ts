@@ -4,10 +4,10 @@ import { UpdateDocumentGroupInfo } from './documents/model/UpdateDocumentGroupIn
 
 export const handler: Handler = (event, context) => {
   context.callbackWaitsForEmptyEventLoop = false
-  return updateDocument(event)
+  return updateDocumentGroup(event)
 }
 
-const updateDocument = async (event: APIGatewayEvent) => {
+const updateDocumentGroup = async (event: APIGatewayEvent) => {
   const conatainer = await createContainer()
   const documentService = conatainer.documentService
   const authService = conatainer.authService

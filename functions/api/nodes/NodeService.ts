@@ -8,6 +8,7 @@ import {
   UpdateDocumentNodeInfo,
   UpdateNodeInfo
 } from './model/UpdateDocumentNodeInfo'
+import { DeleteNodeInfo } from './model/DeleteNodeInfo'
 
 interface ModifiableNode {
   pageId: string
@@ -89,7 +90,7 @@ export class NodeService {
   }
 
   // 子要素の先頭にページ追加
-  async registerPagePreventChileTargetNode(
+  async registerPagePreventChildTargetNode(
     registerPagePreventChileTargetNodeInfo: RegisterPagePreventChileTargetNodeInfo
   ): Promise<boolean> {
     const oTargetPageId = new ObjectId(
@@ -204,9 +205,9 @@ export class NodeService {
   }
 
   // ノード削除
-  async deleteNodeInfo(pageId: string): Promise<void> {
+  async deleteNodeInfo(deleteNodeInfo: DeleteNodeInfo): Promise<void> {
     await this.collections.nodes.deleteOne({
-      _id: new ObjectId(pageId)
+      _id: new ObjectId(deleteNodeInfo.pageId)
     })
   }
 
